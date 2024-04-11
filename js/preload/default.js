@@ -4,7 +4,6 @@ var electron = require('electron')
 var ipc = electron.ipcRenderer
 
 var propertiesToClone = ['deltaX', 'deltaY', 'metaKey', 'ctrlKey', 'defaultPrevented', 'clientX', 'clientY']
-
 function cloneEvent (e) {
   var obj = {}
 
@@ -43,6 +42,45 @@ ipc.on('enterPictureInPicture', function (event, data) {
   if (videos[0]) {
     videos[0].requestPictureInPicture()
   }
+})
+
+var autoPlayUtube = true
+const disableUPlayer = async () => {
+  if(!autoPlayUtube) return // Already disabled
+  const videoPlayer = window.document.getElementById("player")
+  if(!videoPlayer) { setTimeout(disableUPlayer, 100); return } // Wait for the player to load, will try again after 100 ms
+  const videoTag = videoPlayer.getElementsByClassName("html5-main-video")[0] // Youtube's Main <video>
+  const playButton = videoPlayer.getElementsByClassName("ytp-play-button")[0] // Youtube's Play Button
+  const bigPlayButton = window.document.getElementsByClassName("ytp-large-play-button ytp-button")[0]
+  const autoPause = () => { if(!videoTag.paused) videoTag.pause() } 
+  const removeAutoPause = () => { 
+      ipc.send('youtube-main', {type: "player", task: "pause"}) // Send pause => main => youtube-service => pause our player
+      videoTag.play()
+      videoTag.removeEventListener("canplay", autoPause)
+      videoTag.removeEventListener("play", autoPause)
+      autoPlayUtube = true
+      playButton.removeEventListener("click", removeAutoPause)
+      bigPlayButton.removeEventListener("click", removeAutoPause)
+  }
+  setTimeout(() => { // This will run after 100ms, to have a higher probability that the youtube video tag is loaded
+    if(!videoTag) { disableUPlayer(); return } // if not, will try again after 100 ms
+    autoPause() // Pause the video
+    videoTag.addEventListener("canplay", autoPause)
+    videoTag.addEventListener("play", autoPause)
+    playButton.addEventListener("click", removeAutoPause)
+    bigPlayButton.addEventListener("click", removeAutoPause)
+    autoPlayUtube = false
+  }, 100)
+}
+
+ipc.on('youtube', function (event, data) { // Reciever from main process.
+  console.log('RECIEVED FROM IPC ====> Youtube =====>', data)
+  const { status } = data
+  if(status === "playing"){
+    disableUPlayer()
+  }
+  // handle youtube service failure
+  // handle toggle of youtube premium music.
 })
 
 window.addEventListener('message', function (e) {

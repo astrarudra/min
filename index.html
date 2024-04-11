@@ -8,6 +8,7 @@
 
     <link rel="stylesheet" href="dist/bundle.css" />
     <link rel="stylesheet" href="ext/icons/iconfont.css" />
+    <link rel="stylesheet" href="player.css" />
   </head>
 
   <body>
@@ -339,8 +340,29 @@
       <div id="password-viewer-list"></div>
     </div>
 
+    <div id="music-player" style="display: none">
+      <div class="progress">
+        <input type="range" id="seekSlider" min="0" max="10000" value="0" class="slider inactive">
+        <div id="player-timer">
+          <span id="currentTime">0:00</span> / <span id="totalTime">0:00</span>
+        </div>
+    </div>
+      <div class="player-main-space">
+        <div id="title"></div>
+        <div class="controls">
+            <button id="playPauseButton">
+              <i class="i carbon:play-filled" id="playIcon"></i>
+              <i class="i carbon:pause-outline-filled" id="pauseIcon" style="display: none"></i> 
+            </button>
+        </div>
+        <div class="right-pane">
+          <div id="message" class="hide">Message</div>
+        </div>
+      </div>
+    </div>
     <!-- add scripts in Gruntfile.js -->
-
+    <!-- Include Howler.js -->
+    <script src="node_modules/howler/dist/howler.min.js"></script>
     <script src="dist/bundle.js"></script>
   </body>
 </html>

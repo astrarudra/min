@@ -324,6 +324,7 @@ function createWindowWithBounds (bounds) {
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
+var mainRender
 app.on('ready', function () {
   settings.set('restartNow', false)
   appIsReady = true
@@ -340,6 +341,8 @@ app.on('ready', function () {
 
   newWin.webContents.on('did-finish-load', function () {
     // if a URL was passed as a command line argument (probably because Min is set as the default browser on Linux), open it.
+    mainRender = newWin.webContents
+    mainRender.send("youtube-service", {task: "init"})
     handleCommandLineArguments(process.argv)
 
     // there is a URL from an "open-url" event (on Mac)
@@ -447,6 +450,18 @@ ipc.on('request-tab-state', function(e) {
     e.returnValue = data
   })
   otherWindow.webContents.send('read-tab-state')
+})
+
+ipc.on('youtube-main', async (e, data) => {
+  const { type } = data
+  if(type === 'URLChange') {
+    const { youtubeHash, tab } = data
+    tabWebContents.send('youtube', {status: "playing"})
+    mainRender.send('youtube-service', {task: "play", youtubeHash})
+  } else if(type === 'player') { // just forward.
+    mainRender.send('youtube-service', data)
+  }
+  return
 })
 
 /* places service */

@@ -1,0 +1,120 @@
+.success-bg { background-color: #14A44D; }
+.warning-bg { background-color: #E4A11B; }
+.danger-bg { background-color: #DC4C64; }
+/* .secondary { color: #9FA6B2; }
+.success { color: #14A44D; }
+.danger { color: #DC4C64; }
+.info { color: #54B4D3; }
+.light { color: #FBFBFB; }
+.dark { color: #332D2D; } */
+
+.show { display: block; }
+.hide { display: none; }
+
+#music-player {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    background-color: #000337;
+}
+
+#player-timer {
+    position: absolute;
+    right: 0;
+    top: 10px;
+    font-size: 12px;
+    padding-right: 10px;
+    opacity: 0;
+    -webkit-transition: .5s;
+    transition: opacity .5s;
+
+}
+
+.player-main-space {
+    display: flex;
+    align-items: center;
+    padding: 5px;
+}
+.player-main-space #title {
+    width: calc(50% - 100px);
+    font-size: 12px;
+    padding: 0px 10px;
+    text-overflow: ellipsis;
+    overflow: auto;
+    white-space: nowrap;
+}
+.player-main-space .controls {    
+    display: flex;
+    justify-content: center;
+    padding: 5px;
+    width: 200px;
+    padding: 0px 10px;
+}
+.player-main-space .controls button {
+    cursor: pointer;
+    font-size: 38px;
+}
+.player-main-space .right-pane {
+    flex: 1;
+    display: flex;
+    justify-content: flex-end;
+}
+.right-pane #message {
+    border-radius: 5px;
+    padding: 5px 5px;
+    margin-right: 5px;
+    font-size: 12px;
+    justify-content: end;
+    color: rgb(63 63 63);
+    transition: opacity 0.3s ease;
+}
+
+.progress {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding-top: 5px;
+    background: black;
+}
+
+.progress span {
+    font-size: 12px;
+}
+
+.slider {
+    height: 4px;
+    width: 100%;
+    border-radius: 5px;
+}
+
+.inactive::-webkit-slider-thumb {
+    background-color: #DC4C64;
+    -webkit-transition: .5s;
+    transition: opacity .5s;
+    opacity: 0;
+    background-color: #4CAF50;
+}
+.active::-webkit-slider-thumb {
+    background-color: #DC4C64;
+    -webkit-transition: .5s;
+    transition: opacity .5s;
+    opacity: 1;
+}
+
+/* .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #4CAF50;
+    cursor: pointer;
+} */
