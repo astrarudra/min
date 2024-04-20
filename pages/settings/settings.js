@@ -22,6 +22,44 @@ settings.get('restartNow', (value) => {
   }
 })
 
+/* youtube expention */
+
+function changeYTSetting (key, value) {
+  settings.get('ytSettings', function (ytSettings) {
+    if (!ytSettings) {
+      ytSettings = {}
+    }
+    ytSettings[key] = value
+    settings.set('ytSettings', ytSettings)
+  })
+}
+
+var ytGeneralSettings = document.getElementById('general-container')
+var generalOptions = Array.from(ytGeneralSettings.querySelectorAll('input[name=yt-general]'))
+generalOptions.forEach(function (item, idx) {
+  item.addEventListener('change', function (e) {
+    changeYTSetting("general", e.target.value)
+  })
+})
+var ytAutoPauseSetting = document.getElementById('yt-auto-pause')
+ytAutoPauseSetting.addEventListener('change', function () {
+  changeYTSetting("autoPause", this.checked)
+})
+
+settings.onLoad(() => {
+  settings.get('ytSettings', function (ytSettings) {
+    if (!ytSettings) {
+      ytSettings = {
+        general: 'standard',
+        autoPause: false
+      }
+      settings.set('ytSettings', ytSettings)
+    }
+    ytGeneralSettings.querySelector(`#yt-${ytSettings.general}`).checked = true
+    ytAutoPauseSetting.checked = ytSettings.autoPause
+  })
+})
+
 /* content blocking settings */
 
 var trackingLevelContainer = document.getElementById('tracking-level-container')

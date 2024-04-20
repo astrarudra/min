@@ -47,15 +47,15 @@ function onPageURLChange (tab, url) {
       url: url
     })
   }
-  const youtubeHash = uTubeHash(url)
-  if(youtubeHash){ // add trigger yout youtube hash routes. 
+  const ytHash = uTubeHash(url)
+  if(ytHash){ // add trigger yout youtube hash routes. 
     // webviews.adjustMargin([0, 0, -300, 0])
     ipc.send('youtube-main', {
       id: webviews.selectedId,
       tab,
       type: 'URLChange',
       url,
-      youtubeHash
+      ytHash
     })
   }
   webviews.callAsync(tab, 'setVisualZoomLevelLimits', [1, 3])
