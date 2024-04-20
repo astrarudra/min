@@ -1,6 +1,13 @@
 var urlParser = require('util/urlParser.js')
 var settings = require('util/settings/settings.js')
 
+const uTubeHash = (url) => {
+  const regex = /^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/;
+  const match = url.match(regex);
+  if (match) return match[1];
+  return null;
+}
+
 /* implements selecting webviews, switching between them, and creating new ones. */
 
 var placeholderImg = document.getElementById('webview-placeholder')
@@ -40,7 +47,17 @@ function onPageURLChange (tab, url) {
       url: url
     })
   }
-
+  const ytHash = uTubeHash(url)
+  if(ytHash){ // add trigger yout youtube hash routes. 
+    // webviews.adjustMargin([0, 0, -300, 0])
+    ipc.send('youtube-main', {
+      id: webviews.selectedId,
+      tab,
+      type: 'URLChange',
+      url,
+      ytHash
+    })
+  }
   webviews.callAsync(tab, 'setVisualZoomLevelLimits', [1, 3])
 }
 
@@ -527,5 +544,4 @@ ipc.on('windowFocus', function () {
     webviews.focus()
   }
 })
-
 module.exports = webviews

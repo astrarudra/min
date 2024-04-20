@@ -324,6 +324,7 @@ function createWindowWithBounds (bounds) {
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
+var mainRender
 app.on('ready', function () {
   settings.set('restartNow', false)
   appIsReady = true
@@ -340,6 +341,7 @@ app.on('ready', function () {
 
   newWin.webContents.on('did-finish-load', function () {
     // if a URL was passed as a command line argument (probably because Min is set as the default browser on Linux), open it.
+    mainRender = newWin.webContents
     handleCommandLineArguments(process.argv)
 
     // there is a URL from an "open-url" event (on Mac)
@@ -350,6 +352,7 @@ app.on('ready', function () {
       })
       global.URLToOpen = null
     }
+    initExtension()
   })
 
   mainMenu = buildAppMenu()
@@ -448,6 +451,32 @@ ipc.on('request-tab-state', function(e) {
   })
   otherWindow.webContents.send('read-tab-state')
 })
+
+const initExtension = () => {
+  // youtube extension
+  const ytSettings = settings.get('ytSettings')
+  const { general, autoPause } = ytSettings
+  if(general === "disable") return // disable youtube extension
+  mainRender.send("yt-service", {task: "init", settings: ytSettings})
+  ipc.on('youtube-main', async (e, data) => {
+    const { type } = data
+    if(type === 'URLChange') {
+      const ytSettings = settings.get('ytSettings')
+      const { ytHash, tab } = data
+      const tabWebContents = getView(tab).webContents
+      console.log("ytSettings", ytSettings)
+      tabWebContents.send('yt-browser', {task: "enable-download", ytHash, tab})
+      if(autoPause) tabWebContents.send('yt-browser', {task: "enable-auto-pause", ytHash, tab})
+      if(general === "music") mainRender.send('yt-service', {task: "play", ytHash})
+    } else if(type === 'forward-service') { // just forward.
+      mainRender.send('yt-service', data)
+    } else if(type === 'forward-browser') {
+      const tabWebContents = getView(data.tab).webContents
+      tabWebContents.send('yt-browser', data)
+    }
+    return
+  })
+}
 
 /* places service */
 
