@@ -99,6 +99,34 @@ const tabManager = {
       }
     }
 
+    const navigationStart = function (event, url, isInPlace, isMainFrame) {
+      const info = updateCache(id)
+      if (info) {
+        tabEvents.emit('navigation-started', {
+          id: info.id,
+          title: info.title,
+          url: url || info.url,
+          isActive: info.isActive,
+          isMainFrame: !!isMainFrame,
+          isInPlace: !!isInPlace
+        })
+      }
+    }
+
+    const navigationComplete = function (event, url, httpResponseCode, httpStatusText) {
+      const info = updateCache(id)
+      if (info) {
+        tabEvents.emit('navigation-completed', {
+          id: info.id,
+          title: info.title,
+          url: url || info.url,
+          isActive: info.isActive,
+          httpResponseCode: httpResponseCode || null,
+          httpStatusText: httpStatusText || ''
+        })
+      }
+    }
+
     const titleUpdate = function () {
       const info = updateCache(id)
       if (info) {
@@ -106,11 +134,14 @@ const tabManager = {
       }
     }
 
+    webContents.on('did-start-navigation', navigationStart)
     webContents.on('did-navigate', update)
     webContents.on('did-navigate-in-page', update)
+    webContents.on('did-navigate', navigationComplete)
+    webContents.on('did-navigate-in-page', navigationComplete)
     webContents.on('page-title-updated', titleUpdate)
 
-    viewListeners.set(id.toString(), { webContents, update, titleUpdate })
+    viewListeners.set(id.toString(), { webContents, update, titleUpdate, navigationStart, navigationComplete })
 
     const info = updateCache(id) || { id: id.toString() }
     tabEvents.emit('tab-created', info)
@@ -123,6 +154,9 @@ const tabManager = {
     if (listeners && listeners.webContents) {
       listeners.webContents.removeListener('did-navigate', listeners.update)
       listeners.webContents.removeListener('did-navigate-in-page', listeners.update)
+      listeners.webContents.removeListener('did-start-navigation', listeners.navigationStart)
+      listeners.webContents.removeListener('did-navigate', listeners.navigationComplete)
+      listeners.webContents.removeListener('did-navigate-in-page', listeners.navigationComplete)
       listeners.webContents.removeListener('page-title-updated', listeners.titleUpdate)
     }
     viewListeners.delete(key)

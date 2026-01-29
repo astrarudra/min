@@ -176,6 +176,111 @@ const focusSelector = function (selector, clear) {
   }
 }
 
+const rectForSelector = function (selector) {
+  const el = document.querySelector(selector)
+  if (!el) {
+    return { ok: false, error: 'not-found' }
+  }
+
+  if (el.scrollIntoView) {
+    el.scrollIntoView({ block: 'center', inline: 'center' })
+  }
+
+  const rect = el.getBoundingClientRect()
+  return {
+    ok: true,
+    rect: {
+      x: rect.left,
+      y: rect.top,
+      width: rect.width,
+      height: rect.height
+    }
+  }
+}
+
+const fillFormFields = function (fields) {
+  const cssEscape = function (value) {
+    if (window.CSS && window.CSS.escape) {
+      return window.CSS.escape(value)
+    }
+    return value.replace(/[^a-zA-Z0-9_-]/g, '\\\\$&')
+  }
+
+  const results = []
+  const list = Array.isArray(fields) ? fields : []
+
+  list.forEach(function (field) {
+    if (!field) {
+      return
+    }
+    let el = null
+    if (field.selector) {
+      el = document.querySelector(field.selector)
+    } else if (field.name) {
+      const selector = '[name=\"' + cssEscape(field.name) + '\"]'
+      el = document.querySelector(selector)
+    }
+
+    if (!el) {
+      results.push({
+        name: field.name || '',
+        selector: field.selector || '',
+        ok: false,
+        error: 'not-found'
+      })
+      return
+    }
+
+    if ('value' in el) {
+      el.value = field.value == null ? '' : String(field.value)
+    }
+    if (el.dispatchEvent) {
+      el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+
+    results.push({
+      name: field.name || '',
+      selector: field.selector || '',
+      ok: true
+    })
+  })
+
+  return { ok: true, results }
+}
+
+const selectOptionForSelector = function (selector, options) {
+  const el = document.querySelector(selector)
+  if (!el) {
+    return { ok: false, error: 'not-found' }
+  }
+  if (!el.options) {
+    return { ok: false, error: 'not-select' }
+  }
+
+  let option = null
+  if (typeof options.index === 'number') {
+    option = el.options[options.index]
+  } else if (typeof options.value === 'string') {
+    option = Array.from(el.options).find(function (opt) { return opt.value === options.value })
+  } else if (typeof options.label === 'string') {
+    option = Array.from(el.options).find(function (opt) { return (opt.label || opt.textContent || '').trim() === options.label })
+  }
+
+  if (!option) {
+    return { ok: false, error: 'option-not-found' }
+  }
+
+  option.selected = true
+  el.value = option.value
+  if (el.dispatchEvent) {
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    el.dispatchEvent(new Event('change', { bubbles: true }))
+  }
+
+  return { ok: true, value: el.value }
+}
+
 const scrollPage = function (options) {
   const opts = options || {}
   if (opts.selector) {
@@ -204,17 +309,79 @@ const browserController = {
   },
   async newTab (options) {
     const url = options && options.url
-    if (!url) {
-      const error = new Error('newTab requires url')
-      error.status = 400
-      throw error
-    }
     const currentWindow = windows.getCurrent()
-    sendIPCToWindow(currentWindow, 'addTab', { url })
+    const existing = new Set(this.listTabs().map(tab => tab.id))
+
+    if (url) {
+      sendIPCToWindow(currentWindow, 'addTab', { url })
+    } else {
+      sendIPCToWindow(currentWindow, 'addTab')
+    }
+
+    const tabId = await new Promise(function (resolve) {
+      let resolved = false
+      const timer = setTimeout(function () {
+        if (!resolved) {
+          resolved = true
+          if (global.agentTabManager && global.agentTabManager.off) {
+            global.agentTabManager.off('tab-created', onCreated)
+          }
+          resolve(null)
+        }
+      }, 2000)
+
+      const onCreated = function (info) {
+        if (!info || !info.id || existing.has(info.id)) {
+          return
+        }
+        if (resolved) {
+          return
+        }
+        resolved = true
+        clearTimeout(timer)
+        if (global.agentTabManager && global.agentTabManager.off) {
+          global.agentTabManager.off('tab-created', onCreated)
+        }
+        resolve(info.id)
+      }
+
+      if (global.agentTabManager && global.agentTabManager.on) {
+        global.agentTabManager.on('tab-created', onCreated)
+      } else {
+        clearTimeout(timer)
+        resolve(null)
+      }
+    })
+
     return {
       ok: true,
-      url
+      id: tabId,
+      url: url || null
     }
+  },
+  async closeTab (tabId) {
+    const windowsList = windows.getAll()
+    if (!windowsList || windowsList.length === 0) {
+      const error = new Error('No windows available')
+      error.status = 404
+      throw error
+    }
+    windowsList.forEach(function (win) {
+      sendIPCToWindow(win, 'closeTab', { id: tabId.toString() })
+    })
+    return { ok: true, id: tabId.toString() }
+  },
+  async selectTab (tabId) {
+    const windowsList = windows.getAll()
+    if (!windowsList || windowsList.length === 0) {
+      const error = new Error('No windows available')
+      error.status = 404
+      throw error
+    }
+    windowsList.forEach(function (win) {
+      sendIPCToWindow(win, 'selectTab', { id: tabId.toString() })
+    })
+    return { ok: true, id: tabId.toString() }
   },
   _resolveElementSelector (webContents, options) {
     if (!options || !options.elementId) {
@@ -247,6 +414,102 @@ const browserController = {
       x: rect.x + rect.width / 2,
       y: rect.y + rect.height / 2
     }
+  },
+  _normalizeModifiers (modifiers) {
+    if (typeof modifiers === 'number') {
+      return modifiers
+    }
+    if (!modifiers) {
+      return 0
+    }
+    const map = {
+      alt: 1,
+      option: 1,
+      ctrl: 2,
+      control: 2,
+      meta: 4,
+      command: 4,
+      cmd: 4,
+      shift: 8
+    }
+    if (typeof modifiers === 'string') {
+      return map[modifiers.toLowerCase()] || 0
+    }
+    if (Array.isArray(modifiers)) {
+      return modifiers.reduce(function (mask, key) {
+        const value = map[String(key).toLowerCase()] || 0
+        return mask | value
+      }, 0)
+    }
+    if (typeof modifiers === 'object') {
+      let mask = 0
+      if (modifiers.altKey) mask |= 1
+      if (modifiers.ctrlKey) mask |= 2
+      if (modifiers.metaKey) mask |= 4
+      if (modifiers.shiftKey) mask |= 8
+      return mask
+    }
+    return 0
+  },
+  async _getRectForBackendNode (webContents, backendNodeId) {
+    if (!backendNodeId) {
+      return null
+    }
+    await global.agentCdpClient.ensureDomains(webContents, ['DOM'])
+    const quads = await global.agentCdpClient.send(webContents, 'DOM.getContentQuads', { backendNodeId })
+    if (!quads || !quads.quads || !quads.quads.length) {
+      return null
+    }
+    const quad = quads.quads[0]
+    let minX = Infinity
+    let minY = Infinity
+    let maxX = -Infinity
+    let maxY = -Infinity
+    for (let i = 0; i < quad.length; i += 2) {
+      const x = quad[i]
+      const y = quad[i + 1]
+      minX = Math.min(minX, x)
+      minY = Math.min(minY, y)
+      maxX = Math.max(maxX, x)
+      maxY = Math.max(maxY, y)
+    }
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    }
+  },
+  async _resolvePoint (webContents, options) {
+    const resolvedOptions = this._resolveElementSelector(webContents, options || {})
+    if (resolvedOptions && typeof resolvedOptions.backendNodeId !== 'undefined') {
+      const backendNodeId = typeof resolvedOptions.backendNodeId === 'string' ? parseInt(resolvedOptions.backendNodeId, 10) : resolvedOptions.backendNodeId
+      const rect = await this._getRectForBackendNode(webContents, backendNodeId)
+      if (!rect) {
+        return null
+      }
+      return this._getClickPoint(rect)
+    }
+
+    let x = resolvedOptions && typeof resolvedOptions.x === 'number' ? resolvedOptions.x : null
+    let y = resolvedOptions && typeof resolvedOptions.y === 'number' ? resolvedOptions.y : null
+
+    if ((x === null || y === null) && resolvedOptions && resolvedOptions.selector) {
+      const expression = buildExpression(rectForSelector, [resolvedOptions.selector])
+      const rectResult = await global.agentCdpClient.evaluate(webContents, expression)
+      if (!rectResult.value.ok) {
+        return null
+      }
+      const point = this._getClickPoint(rectResult.value.rect)
+      x = point.x
+      y = point.y
+    }
+
+    if (x === null || y === null) {
+      return null
+    }
+
+    return { x, y }
   },
   async getHtml (tabId) {
     const webContents = this._getWebContents(tabId)
@@ -319,54 +582,52 @@ const browserController = {
       url
     }
   },
+  async navigateBack (tabId) {
+    const webContents = this._getWebContents(tabId)
+    if (webContents.canGoBack && webContents.canGoBack()) {
+      webContents.goBack()
+      return { id: tabId.toString(), ok: true }
+    }
+    return { id: tabId.toString(), ok: false, error: 'no-back-entry' }
+  },
   async click (tabId, options) {
     const webContents = this._getWebContents(tabId)
     await global.agentCdpClient.ensureDomains(webContents, ['Input', 'Runtime'])
 
     const resolvedOptions = this._resolveElementSelector(webContents, options || {})
-
-    let x = resolvedOptions && typeof resolvedOptions.x === 'number' ? resolvedOptions.x : null
-    let y = resolvedOptions && typeof resolvedOptions.y === 'number' ? resolvedOptions.y : null
-
-    if ((x === null || y === null) && resolvedOptions && resolvedOptions.selector) {
-      const expression = buildExpression(focusSelector, [resolvedOptions.selector, false])
-      const focusResult = await global.agentCdpClient.evaluate(webContents, expression)
-      if (!focusResult.value.ok) {
-        const error = new Error('Element not found')
-        error.status = 404
-        throw error
-      }
-      const rect = focusResult.value.rect
-      const point = this._getClickPoint(rect)
-      x = point.x
-      y = point.y
-    }
-
-    if (x === null || y === null) {
-      const error = new Error('Click requires selector or coordinates')
+    const point = await this._resolvePoint(webContents, resolvedOptions)
+    if (!point) {
+      const error = new Error('Click requires selector, backendNodeId, or coordinates')
       error.status = 400
       throw error
     }
 
+    const modifiers = this._normalizeModifiers(resolvedOptions.modifiers)
+    const clickCount = resolvedOptions.double ? 2 : (resolvedOptions.clickCount || 1)
+    const button = resolvedOptions.button || 'left'
+
     await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
       type: 'mouseMoved',
-      x,
-      y,
-      button: 'left'
+      x: point.x,
+      y: point.y,
+      button,
+      modifiers
     })
     await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
       type: 'mousePressed',
-      x,
-      y,
-      button: 'left',
-      clickCount: 1
+      x: point.x,
+      y: point.y,
+      button,
+      modifiers,
+      clickCount
     })
     await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
       type: 'mouseReleased',
-      x,
-      y,
-      button: 'left',
-      clickCount: 1
+      x: point.x,
+      y: point.y,
+      button,
+      modifiers,
+      clickCount
     })
 
     return {
@@ -487,6 +748,160 @@ const browserController = {
       }
     }
   },
+  async hover (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    await global.agentCdpClient.ensureDomains(webContents, ['Input', 'Runtime'])
+
+    const resolvedOptions = this._resolveElementSelector(webContents, options || {})
+    const point = await this._resolvePoint(webContents, resolvedOptions)
+    if (!point) {
+      const error = new Error('Hover requires selector, backendNodeId, or coordinates')
+      error.status = 400
+      throw error
+    }
+
+    const modifiers = this._normalizeModifiers(resolvedOptions.modifiers)
+
+    await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: point.x,
+      y: point.y,
+      modifiers
+    })
+
+    return { id: tabId.toString(), ok: true }
+  },
+  async drag (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    await global.agentCdpClient.ensureDomains(webContents, ['Input', 'Runtime'])
+
+    if (!options) {
+      const error = new Error('Drag requires from/to coordinates or selectors')
+      error.status = 400
+      throw error
+    }
+
+    const fromOptions = options.from || { selector: options.fromSelector, x: options.fromX, y: options.fromY, elementId: options.fromElementId, backendNodeId: options.fromBackendNodeId }
+    const toOptions = options.to || { selector: options.toSelector, x: options.toX, y: options.toY, elementId: options.toElementId, backendNodeId: options.toBackendNodeId }
+
+    const fromPoint = await this._resolvePoint(webContents, fromOptions)
+    const toPoint = await this._resolvePoint(webContents, toOptions)
+
+    if (!fromPoint || !toPoint) {
+      const error = new Error('Drag requires both from and to points')
+      error.status = 400
+      throw error
+    }
+
+    const modifiers = this._normalizeModifiers(options.modifiers)
+    const button = options.button || 'left'
+
+    await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: fromPoint.x,
+      y: fromPoint.y,
+      modifiers
+    })
+    await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
+      type: 'mousePressed',
+      x: fromPoint.x,
+      y: fromPoint.y,
+      button,
+      modifiers,
+      clickCount: 1
+    })
+    await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
+      type: 'mouseMoved',
+      x: toPoint.x,
+      y: toPoint.y,
+      button,
+      modifiers,
+      buttons: 1
+    })
+    await global.agentCdpClient.send(webContents, 'Input.dispatchMouseEvent', {
+      type: 'mouseReleased',
+      x: toPoint.x,
+      y: toPoint.y,
+      button,
+      modifiers,
+      clickCount: 1
+    })
+
+    return { id: tabId.toString(), ok: true }
+  },
+  async pressKey (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    await global.agentCdpClient.ensureDomains(webContents, ['Input'])
+
+    if (!options || !options.key) {
+      const error = new Error('pressKey requires key')
+      error.status = 400
+      throw error
+    }
+
+    const key = String(options.key)
+    const code = options.code || key
+    const text = key.length === 1 ? key : ''
+    const modifiers = this._normalizeModifiers(options.modifiers)
+
+    await global.agentCdpClient.send(webContents, 'Input.dispatchKeyEvent', {
+      type: 'keyDown',
+      key,
+      code,
+      text,
+      modifiers
+    })
+    await global.agentCdpClient.send(webContents, 'Input.dispatchKeyEvent', {
+      type: 'keyUp',
+      key,
+      code,
+      modifiers
+    })
+
+    return { id: tabId.toString(), ok: true }
+  },
+  async fillForm (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    const fields = options && options.fields
+    if (!fields || !Array.isArray(fields)) {
+      const error = new Error('fillForm requires fields array')
+      error.status = 400
+      throw error
+    }
+    const expression = buildExpression(fillFormFields, [fields])
+    const result = await global.agentCdpClient.evaluate(webContents, expression)
+    return {
+      id: tabId.toString(),
+      ok: result.value.ok,
+      results: result.value.results || []
+    }
+  },
+  async selectOption (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    const resolvedOptions = this._resolveElementSelector(webContents, options || {})
+    if (!resolvedOptions.selector) {
+      const error = new Error('selectOption requires selector or elementId')
+      error.status = 400
+      throw error
+    }
+    const payload = {
+      value: resolvedOptions.value,
+      label: resolvedOptions.label,
+      index: resolvedOptions.index
+    }
+    const expression = buildExpression(selectOptionForSelector, [resolvedOptions.selector, payload])
+    const result = await global.agentCdpClient.evaluate(webContents, expression)
+    if (!result.value.ok) {
+      const error = new Error(result.value.error || 'selectOption failed')
+      error.status = 400
+      throw error
+    }
+    return {
+      id: tabId.toString(),
+      ok: true,
+      value: result.value.value
+    }
+  },
   async scroll (tabId, options) {
     const webContents = this._getWebContents(tabId)
     const expression = buildExpression(scrollPage, [options || {}])
@@ -497,6 +912,40 @@ const browserController = {
       x: result.value.x,
       y: result.value.y
     }
+  },
+  async resize (tabId, options) {
+    const win = windows.getCurrent()
+    if (!win) {
+      const error = new Error('No active window')
+      error.status = 404
+      throw error
+    }
+    const bounds = win.getBounds()
+    const opts = options || {}
+    const width = typeof opts.width === 'number' ? opts.width : bounds.width
+    const height = typeof opts.height === 'number' ? opts.height : bounds.height
+    win.setSize(Math.max(100, Math.floor(width)), Math.max(100, Math.floor(height)))
+    return { id: tabId.toString(), ok: true, width, height }
+  },
+  async getConsoleMessages (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    return global.agentConsoleService.getMessages(webContents, options || {})
+  },
+  async getNetworkRequests (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    return global.agentNetworkService.getRequests(webContents, options || {})
+  },
+  async accessibilitySnapshot (tabId) {
+    const webContents = this._getWebContents(tabId)
+    const snapshot = await global.agentAccessibilityService.getSnapshot(webContents)
+    return Object.assign({
+      url: webContents.getURL() || '',
+      title: webContents.getTitle() || ''
+    }, snapshot)
+  },
+  async handleDialog (tabId, options) {
+    const webContents = this._getWebContents(tabId)
+    return global.agentDialogService.handleDialog(webContents, options || {})
   },
   async exec (tabId, options) {
     const webContents = this._getWebContents(tabId)
@@ -515,6 +964,9 @@ const browserController = {
       id: tabId.toString(),
       result: result.value !== undefined ? result.value : result
     }
+  },
+  async evaluate (tabId, options) {
+    return this.exec(tabId, options)
   }
 }
 

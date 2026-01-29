@@ -95,15 +95,14 @@ function agentGetOpenApiSpec (port) {
         post: {
           summary: 'Open a new tab',
           requestBody: {
-            required: true,
+            required: false,
             content: {
               'application/json': {
                 schema: {
                   type: 'object',
                   properties: {
                     url: { type: 'string' }
-                  },
-                  required: ['url']
+                  }
                 }
               }
             }
@@ -229,8 +228,13 @@ function agentGetOpenApiSpec (port) {
                   properties: {
                     selector: { type: 'string' },
                     elementId: { type: 'string' },
+                    backendNodeId: { type: 'number' },
                     x: { type: 'number' },
-                    y: { type: 'number' }
+                    y: { type: 'number' },
+                    button: { type: 'string' },
+                    clickCount: { type: 'number' },
+                    double: { type: 'boolean' },
+                    modifiers: { type: 'array', items: { type: 'string' } }
                   }
                 }
               }
@@ -328,6 +332,242 @@ function agentGetOpenApiSpec (port) {
             }
           },
           responses: { 200: { description: 'Script result' } }
+        }
+      },
+      '/tabs/{id}/evaluate': {
+        post: {
+          summary: 'Evaluate script (alias for exec)',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    script: { type: 'string' },
+                    awaitPromise: { type: 'boolean' },
+                    returnByValue: { type: 'boolean' }
+                  },
+                  required: ['script']
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Script result' } }
+        }
+      },
+      '/tabs/{id}/close': {
+        post: {
+          summary: 'Close a tab',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { 200: { description: 'Tab closed' } }
+        }
+      },
+      '/tabs/{id}/select': {
+        post: {
+          summary: 'Select a tab',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { 200: { description: 'Tab selected' } }
+        }
+      },
+      '/tabs/{id}/back': {
+        post: {
+          summary: 'Navigate back in history',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { 200: { description: 'Navigation result' } }
+        }
+      },
+      '/tabs/{id}/axSnapshot': {
+        get: {
+          summary: 'Get accessibility snapshot with element refs',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          responses: { 200: { description: 'Accessibility snapshot' } }
+        }
+      },
+      '/tabs/{id}/console': {
+        get: {
+          summary: 'Get console messages',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'limit', in: 'query', required: false, schema: { type: 'number' } },
+            { name: 'since', in: 'query', required: false, schema: { type: 'number' } },
+            { name: 'clear', in: 'query', required: false, schema: { type: 'boolean' } }
+          ],
+          responses: { 200: { description: 'Console messages' } }
+        }
+      },
+      '/tabs/{id}/network': {
+        get: {
+          summary: 'Get network requests',
+          parameters: [
+            { name: 'id', in: 'path', required: true, schema: { type: 'string' } },
+            { name: 'limit', in: 'query', required: false, schema: { type: 'number' } },
+            { name: 'since', in: 'query', required: false, schema: { type: 'number' } },
+            { name: 'clear', in: 'query', required: false, schema: { type: 'boolean' } }
+          ],
+          responses: { 200: { description: 'Network requests' } }
+        }
+      },
+      '/tabs/{id}/pressKey': {
+        post: {
+          summary: 'Press a keyboard key',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    key: { type: 'string' },
+                    code: { type: 'string' },
+                    modifiers: { type: 'array', items: { type: 'string' } }
+                  },
+                  required: ['key']
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Key press dispatched' } }
+        }
+      },
+      '/tabs/{id}/hover': {
+        post: {
+          summary: 'Hover over an element',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    selector: { type: 'string' },
+                    elementId: { type: 'string' },
+                    backendNodeId: { type: 'number' },
+                    x: { type: 'number' },
+                    y: { type: 'number' },
+                    modifiers: { type: 'array', items: { type: 'string' } }
+                  }
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Hover dispatched' } }
+        }
+      },
+      '/tabs/{id}/drag': {
+        post: {
+          summary: 'Drag from one point to another',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    from: { type: 'object' },
+                    to: { type: 'object' },
+                    fromSelector: { type: 'string' },
+                    toSelector: { type: 'string' },
+                    fromX: { type: 'number' },
+                    fromY: { type: 'number' },
+                    toX: { type: 'number' },
+                    toY: { type: 'number' },
+                    button: { type: 'string' },
+                    modifiers: { type: 'array', items: { type: 'string' } }
+                  }
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Drag dispatched' } }
+        }
+      },
+      '/tabs/{id}/fillForm': {
+        post: {
+          summary: 'Fill form fields',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    fields: { type: 'array', items: { type: 'object' } }
+                  },
+                  required: ['fields']
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Form fill result' } }
+        }
+      },
+      '/tabs/{id}/selectOption': {
+        post: {
+          summary: 'Select option in dropdown',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    selector: { type: 'string' },
+                    elementId: { type: 'string' },
+                    value: { type: 'string' },
+                    label: { type: 'string' },
+                    index: { type: 'number' }
+                  }
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Select result' } }
+        }
+      },
+      '/tabs/{id}/handleDialog': {
+        post: {
+          summary: 'Handle JavaScript dialog',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    accept: { type: 'boolean' },
+                    promptText: { type: 'string' }
+                  }
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Dialog handled' } }
+        }
+      },
+      '/tabs/{id}/resize': {
+        post: {
+          summary: 'Resize browser window',
+          parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
+          requestBody: {
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    width: { type: 'number' },
+                    height: { type: 'number' }
+                  }
+                }
+              }
+            }
+          },
+          responses: { 200: { description: 'Window resized' } }
         }
       }
     }
@@ -575,8 +815,44 @@ async function agentHandleRequest (req, res) {
       return
     }
 
+    if (req.method === 'GET' && action === 'axSnapshot') {
+      const result = await global.agentBrowserController.accessibilitySnapshot(tabId)
+      agentSendJson(res, 200, result)
+      return
+    }
+
     if (req.method === 'GET' && action === 'elements') {
       const result = await global.agentBrowserController.elements(tabId)
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'GET' && action === 'console') {
+      const limitParam = url.searchParams.get('limit')
+      const sinceParam = url.searchParams.get('since')
+      const limitValue = limitParam ? parseInt(limitParam, 10) : undefined
+      const sinceValue = sinceParam ? parseInt(sinceParam, 10) : undefined
+      const options = {
+        limit: Number.isNaN(limitValue) ? undefined : limitValue,
+        since: Number.isNaN(sinceValue) ? undefined : sinceValue,
+        clear: url.searchParams.get('clear') === 'true'
+      }
+      const result = await global.agentBrowserController.getConsoleMessages(tabId, options)
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'GET' && action === 'network') {
+      const limitParam = url.searchParams.get('limit')
+      const sinceParam = url.searchParams.get('since')
+      const limitValue = limitParam ? parseInt(limitParam, 10) : undefined
+      const sinceValue = sinceParam ? parseInt(sinceParam, 10) : undefined
+      const options = {
+        limit: Number.isNaN(limitValue) ? undefined : limitValue,
+        since: Number.isNaN(sinceValue) ? undefined : sinceValue,
+        clear: url.searchParams.get('clear') === 'true'
+      }
+      const result = await global.agentBrowserController.getNetworkRequests(tabId, options)
       agentSendJson(res, 200, result)
       return
     }
@@ -612,6 +888,24 @@ async function agentHandleRequest (req, res) {
       return
     }
 
+    if (req.method === 'POST' && action === 'back') {
+      const result = await global.agentBrowserController.navigateBack(tabId)
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'close') {
+      const result = await global.agentBrowserController.closeTab(tabId)
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'select') {
+      const result = await global.agentBrowserController.selectTab(tabId)
+      agentSendJson(res, 200, result)
+      return
+    }
+
     if (req.method === 'POST' && action === 'click') {
       const body = await agentReadJsonBody(req)
       const result = await global.agentBrowserController.click(tabId, body || {})
@@ -633,6 +927,41 @@ async function agentHandleRequest (req, res) {
       return
     }
 
+    if (req.method === 'POST' && action === 'pressKey') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.pressKey(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'hover') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.hover(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'drag') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.drag(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'fillForm') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.fillForm(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'selectOption') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.selectOption(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
     if (req.method === 'POST' && action === 'scroll') {
       const body = await agentReadJsonBody(req)
       const result = await global.agentBrowserController.scroll(tabId, body || {})
@@ -643,6 +972,27 @@ async function agentHandleRequest (req, res) {
     if (req.method === 'POST' && action === 'exec') {
       const body = await agentReadJsonBody(req)
       const result = await global.agentBrowserController.exec(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'evaluate') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.evaluate(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'handleDialog') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.handleDialog(tabId, body || {})
+      agentSendJson(res, 200, result)
+      return
+    }
+
+    if (req.method === 'POST' && action === 'resize') {
+      const body = await agentReadJsonBody(req)
+      const result = await global.agentBrowserController.resize(tabId, body || {})
       agentSendJson(res, 200, result)
       return
     }

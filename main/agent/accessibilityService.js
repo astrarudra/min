@@ -78,6 +78,56 @@ async function agentGetBoundsForBackendNode (webContents, backendNodeId) {
 }
 
 const agentAccessibilityService = {
+  async getSnapshot (webContents) {
+    await global.agentCdpClient.ensureDomains(webContents, ['Accessibility', 'DOM'])
+    const axTree = await global.agentCdpClient.send(webContents, 'Accessibility.getFullAXTree')
+    const nodes = axTree.nodes || []
+
+    const results = []
+    let boundsCount = 0
+    const maxBounds = 300
+
+    for (let i = 0; i < nodes.length; i++) {
+      const node = nodes[i]
+      if (!node) {
+        continue
+      }
+      const role = agentGetAxValue(node.role)
+      const name = agentGetAxValue(node.name)
+      const value = agentGetAxValue(node.value)
+      const description = agentGetAxValue(node.description)
+      const visible = agentIsVisibleAxNode(node)
+      let bounds = null
+      if (node.backendDOMNodeId && boundsCount < maxBounds) {
+        bounds = await agentGetBoundsForBackendNode(webContents, node.backendDOMNodeId)
+        boundsCount++
+      }
+      const properties = (node.properties || []).map(function (prop) {
+        return {
+          name: prop.name,
+          value: agentGetAxValue(prop.value)
+        }
+      })
+
+      results.push({
+        nodeId: node.nodeId || null,
+        backendDOMNodeId: node.backendDOMNodeId || null,
+        role,
+        name,
+        value,
+        description,
+        childIds: node.childIds || [],
+        parentId: node.parentId || null,
+        visible,
+        bounds,
+        properties
+      })
+    }
+
+    return {
+      nodes: results
+    }
+  },
   async getTree (webContents) {
     await global.agentCdpClient.ensureDomains(webContents, ['Accessibility', 'DOM'])
     const axTree = await global.agentCdpClient.send(webContents, 'Accessibility.getFullAXTree')

@@ -83,6 +83,26 @@ module.exports = {
       })
     })
 
+    ipc.on('closeTab', function (e, data) {
+      if (!data || !data.id) {
+        return
+      }
+      if (!tabs.get(data.id)) {
+        return
+      }
+      browserUI.closeTab(data.id)
+    })
+
+    ipc.on('selectTab', function (e, data) {
+      if (!data || !data.id) {
+        return
+      }
+      if (!tabs.get(data.id)) {
+        return
+      }
+      browserUI.switchToTab(data.id)
+    })
+
     ipc.on('saveCurrentPage', async function () {
       var currentTab = tabs.get(tabs.getSelected())
 

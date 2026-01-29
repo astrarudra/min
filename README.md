@@ -74,22 +74,36 @@ Endpoints:
 - `GET /docs` (Swagger UI)
 - `GET /tabs`
 - `GET /tabs/active`
-- `POST /tabs/new` `{ "url": "https://example.com" }`
+- `POST /tabs/new` `{ "url": "https://example.com" }` (URL optional)
+- `POST /tabs/:id/close`
+- `POST /tabs/:id/select`
 - `GET /tabs/:id/html`
 - `GET /tabs/:id/text` (returns main content text plus links/buttons/inputs/forms)
 - `GET /tabs/:id/snapshot`
 - `GET /tabs/:id/accessibility`
+- `GET /tabs/:id/axSnapshot` (accessibility snapshot with element refs)
 - `GET /tabs/:id/elements`
+- `GET /tabs/:id/console`
+- `GET /tabs/:id/network`
 - Elements include an `id` that can be used as `elementId` in click/type.
 - `POST /tabs/:id/query` `{ "selector": "...", "limit": 50 }`
 - `POST /tabs/:id/waitFor` `{ "selector": ".price" }` or `{ "text": "Checkout" }`
 - `GET /tabs/:id/screenshot`
 - `POST /tabs/:id/navigate` `{ "url": "https://example.com" }`
+- `POST /tabs/:id/back`
 - `POST /tabs/:id/click` `{ "selector": "a.login" }`, `{ "elementId": "e2" }`, or `{ "x": 10, "y": 20 }`
 - `POST /tabs/:id/clickByText` `{ "text": "Buy Now" }`
 - `POST /tabs/:id/type` `{ "selector": "input[name=q]", "text": "hello", "clear": true }` or `{ "elementId": "e5", "text": "hello" }`
+- `POST /tabs/:id/pressKey` `{ "key": "Enter" }`
+- `POST /tabs/:id/hover` `{ "selector": ".menu" }`
+- `POST /tabs/:id/drag` `{ "fromSelector": ".thumb", "toSelector": ".target" }`
+- `POST /tabs/:id/fillForm` `{ "fields": [ { "selector": "#email", "value": "me@example.com" } ] }`
+- `POST /tabs/:id/selectOption` `{ "selector": "select#size", "label": "Large" }`
 - `POST /tabs/:id/scroll` `{ "deltaY": 800 }` or `{ "x": 0, "y": 1200 }`
 - `POST /tabs/:id/exec` `{ "script": "document.title" }`
+- `POST /tabs/:id/evaluate` `{ "script": "document.title" }`
+- `POST /tabs/:id/handleDialog` `{ "accept": true }`
+- `POST /tabs/:id/resize` `{ "width": 1280, "height": 720 }`
 - `WS /events` (optional) emits `tab-created`, `tab-closed`, `url-changed`
 
 Example requests:
@@ -109,6 +123,9 @@ curl -X POST http://127.0.0.1:9333/tabs/123/waitFor \\
   -d '{"text":"Checkout","timeout":8000}'
 curl -X POST http://127.0.0.1:9333/tabs/123/clickByText \\
   -d '{"text":"Buy Now"}'
+curl -X POST http://127.0.0.1:9333/tabs/123/pressKey \\
+  -d '{"key":"Enter"}'
+curl http://127.0.0.1:9333/tabs/123/console
 ```
 
 Example agent flow:
@@ -118,6 +135,36 @@ Example agent flow:
 3) `POST /tabs/:id/waitFor` to wait for a target element  
 4) `POST /tabs/:id/clickByText` or `POST /tabs/:id/click` to act  
 5) `GET /tabs/:id/elements` to discover fallback selectors and element ids
+
+### MCP Server (Embedded)
+
+Min also exposes an embedded MCP (Model Context Protocol) server for agent integrations.
+
+Configuration:
+
+- Port: `9344` by default. Override with the `MIN_MCP_PORT` environment variable or set `"mcpPort"` in `settings.json`.
+
+Endpoints:
+
+- `POST/GET http://127.0.0.1:9344/mcp` (Streamable HTTP transport)
+- `GET http://127.0.0.1:9344/health`
+
+Tools:
+
+- `list_tabs`, `get_active_tab`
+- `page_snapshot`, `page_accessibility`, `page_elements`, `page_text`, `page_html`
+- `navigate`, `click_by_text`, `execute_script`, `wait_for`, `scroll`
+- `screenshot`
+- `browser_tabs`, `browser_navigate`, `browser_navigate_back`
+- `browser_new_tab`
+- `browser_snapshot`, `browser_take_screenshot`, `browser_console_messages`, `browser_network_requests`, `browser_evaluate`
+- `browser_click`, `browser_type`, `browser_press_key`, `browser_hover`, `browser_drag`
+- `browser_fill_form`, `browser_select_option`, `browser_handle_dialog`
+- `browser_wait_for`, `browser_resize`
+
+Event stream:
+
+Notifications are emitted for `navigation-started`, `navigation-completed`, `page-changed`, and `waitFor-resolved` as MCP notifications with method `notifications/page-event`.
 
 ### Building binaries
 
