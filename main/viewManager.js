@@ -237,6 +237,9 @@ function createView (existingViewId, id, webPreferences, boundsString, events) {
   view.setBounds(JSON.parse(boundsString))
 
   viewMap[id] = view
+  if (global.agentTabManager && global.agentTabManager.handleViewCreated) {
+    global.agentTabManager.handleViewCreated(id, view)
+  }
 
   return view
 }
@@ -252,6 +255,9 @@ function destroyView (id) {
       windows.getState(window).selectedView = null
     }
   })
+  if (global.agentTabManager && global.agentTabManager.handleViewDestroyed) {
+    global.agentTabManager.handleViewDestroyed(id)
+  }
   viewMap[id].webContents.destroy()
 
   delete viewMap[id]
@@ -313,6 +319,10 @@ function hideCurrentView (senderContents) {
 
 function getView (id) {
   return viewMap[id]
+}
+
+function getAllViewIds () {
+  return Object.keys(viewMap)
 }
 
 function getTabIDFromWebContents (contents) {
@@ -466,3 +476,4 @@ ipc.on('saveViewCapture', function (e, data) {
 })
 
 global.getView = getView
+global.getAllViewIds = getAllViewIds

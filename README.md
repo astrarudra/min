@@ -57,6 +57,68 @@ If you want to develop Min:
 - Start Min in development mode by running `npm run start`.
 - After you make changes, press `alt+ctrl+r` (or `opt+cmd+r` on Mac) to reload the browser UI.
 
+### Local Agent Control API
+
+Min exposes a local-only JSON API from the Electron main process for AI agents and automation.
+
+Configuration:
+
+- Port: `9333` by default. Override with the `MIN_AGENT_PORT` environment variable or set `"agentApiPort"` in `settings.json`.
+
+Base URL: `http://127.0.0.1:9333` (localhost only).
+
+Endpoints:
+
+- `GET /health`
+- `GET /openapi.json`
+- `GET /docs` (Swagger UI)
+- `GET /tabs`
+- `GET /tabs/active`
+- `POST /tabs/new` `{ "url": "https://example.com" }`
+- `GET /tabs/:id/html`
+- `GET /tabs/:id/text` (returns main content text plus links/buttons/inputs/forms)
+- `GET /tabs/:id/snapshot`
+- `GET /tabs/:id/accessibility`
+- `GET /tabs/:id/elements`
+- Elements include an `id` that can be used as `elementId` in click/type.
+- `POST /tabs/:id/query` `{ "selector": "...", "limit": 50 }`
+- `POST /tabs/:id/waitFor` `{ "selector": ".price" }` or `{ "text": "Checkout" }`
+- `GET /tabs/:id/screenshot`
+- `POST /tabs/:id/navigate` `{ "url": "https://example.com" }`
+- `POST /tabs/:id/click` `{ "selector": "a.login" }`, `{ "elementId": "e2" }`, or `{ "x": 10, "y": 20 }`
+- `POST /tabs/:id/clickByText` `{ "text": "Buy Now" }`
+- `POST /tabs/:id/type` `{ "selector": "input[name=q]", "text": "hello", "clear": true }` or `{ "elementId": "e5", "text": "hello" }`
+- `POST /tabs/:id/scroll` `{ "deltaY": 800 }` or `{ "x": 0, "y": 1200 }`
+- `POST /tabs/:id/exec` `{ "script": "document.title" }`
+- `WS /events` (optional) emits `tab-created`, `tab-closed`, `url-changed`
+
+Example requests:
+
+```sh
+curl http://127.0.0.1:9333/health
+curl http://127.0.0.1:9333/tabs
+curl http://127.0.0.1:9333/tabs/active
+curl -X POST http://127.0.0.1:9333/tabs/new \\
+  -d '{"url":"https://example.com"}'
+curl -X POST http://127.0.0.1:9333/tabs/123/navigate \\
+  -d '{"url":"https://example.com"}'
+curl -X POST http://127.0.0.1:9333/tabs/123/query \\
+  -d '{"selector":"a"}'
+curl http://127.0.0.1:9333/tabs/123/snapshot
+curl -X POST http://127.0.0.1:9333/tabs/123/waitFor \\
+  -d '{"text":"Checkout","timeout":8000}'
+curl -X POST http://127.0.0.1:9333/tabs/123/clickByText \\
+  -d '{"text":"Buy Now"}'
+```
+
+Example agent flow:
+
+1) `GET /tabs/active` to find the active tab id  
+2) `GET /tabs/:id/snapshot` to understand the page  
+3) `POST /tabs/:id/waitFor` to wait for a target element  
+4) `POST /tabs/:id/clickByText` or `POST /tabs/:id/click` to act  
+5) `GET /tabs/:id/elements` to discover fallback selectors and element ids
+
 ### Building binaries
 
 In order to build Min from source, follow the installation instructions above, then use one of the following commands to create binaries:
