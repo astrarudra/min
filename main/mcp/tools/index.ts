@@ -178,7 +178,7 @@ function agentMcpBuildToolDefinitions (z, resolveTabId, emitEvent) {
         action: z.enum(['list', 'create', 'close', 'select']).optional(),
         tabId: z.string().optional(),
         url: z.string().optional()
-      }).optional(),
+      }),
       handler: async (args) => {
         const action = (args && args.action) || (args && args.url ? 'create' : (args && args.tabId ? 'select' : 'list'))
         if (action === 'list') {
@@ -252,7 +252,7 @@ function agentMcpBuildToolDefinitions (z, resolveTabId, emitEvent) {
         limit: z.number().optional(),
         since: z.number().optional(),
         clear: z.boolean().optional()
-      }).optional(),
+      }),
       handler: async (args) => {
         const tabId = resolveTabId(args)
         return global.agentActionService.consoleMessages(tabId, args || {})
@@ -266,7 +266,7 @@ function agentMcpBuildToolDefinitions (z, resolveTabId, emitEvent) {
         limit: z.number().optional(),
         since: z.number().optional(),
         clear: z.boolean().optional()
-      }).optional(),
+      }),
       handler: async (args) => {
         const tabId = resolveTabId(args)
         return global.agentActionService.networkRequests(tabId, args || {})
@@ -464,6 +464,44 @@ function agentMcpBuildToolDefinitions (z, resolveTabId, emitEvent) {
       handler: async (args) => {
         const tabId = resolveTabId(args)
         return global.agentActionService.resize(tabId, args || {})
+      }
+    },
+    {
+      name: 'chatgpt_prompt',
+      description: 'Send a prompt to ChatGPT and stream response chunks',
+      inputSchema: z.object({
+        prompt: z.string(),
+        tabId: z.string().optional(),
+        stream: z.boolean().optional()
+      }),
+      handler: async (args) => {
+        const run = await global.agentChatGptController.runPrompt({
+          prompt: args.prompt,
+          tabId: args.tabId,
+          focusTab: true
+        })
+
+        return new Promise(function (resolve, reject) {
+          let fullText = ''
+          run.events.on('chunk', function (payload) {
+            if (payload && payload.text) {
+              fullText += payload.text
+            }
+            if (args.stream && emitEvent) {
+              emitEvent('chatgpt-chunk', { runId: payload.runId, text: payload.text })
+            }
+          })
+          run.events.on('complete', function (payload) {
+            const text = payload && payload.fullText ? payload.fullText : fullText
+            if (args.stream && emitEvent) {
+              emitEvent('chatgpt-complete', { runId: payload.runId, fullText: text })
+            }
+            resolve({ runId: payload.runId, tabId: run.tabId, fullText: text })
+          })
+          run.events.on('error', function (payload) {
+            reject(new Error(payload.message || 'ChatGPT run failed'))
+          })
+        })
       }
     }
   ]

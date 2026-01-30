@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Min ChatGPT Socket Test</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 24px;
+      color: #222;
+    }
+    textarea {
+      width: 100%;
+      height: 120px;
+      margin-bottom: 12px;
+    }
+    button {
+      margin-right: 8px;
+    }
+    #log {
+      margin-top: 16px;
+      padding: 12px;
+      border: 1px solid #ccc;
+      background: #fafafa;
+      height: 240px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+    }
+    .row {
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Min ChatGPT WebSocket Test</h1>
+
+  <div class="row">
+    <label for="wsUrl">WebSocket URL</label><br />
+    <input id="wsUrl" type="text" value="ws://127.0.0.1:9333/stream" style="width:100%" />
+  </div>
+
+  <div class="row">
+    <label for="prompt">Prompt</label><br />
+    <textarea id="prompt">Explain MCP simply.</textarea>
+  </div>
+
+  <div class="row">
+    <button id="connect">Connect</button>
+    <button id="send" disabled>Send</button>
+    <button id="cancel" disabled>Cancel</button>
+    <button id="clear">Clear Log</button>
+  </div>
+
+  <div id="status">Status: Disconnected</div>
+  <div id="log"></div>
+
+  <script>
+    const connectBtn = document.getElementById('connect')
+    const sendBtn = document.getElementById('send')
+    const cancelBtn = document.getElementById('cancel')
+    const clearBtn = document.getElementById('clear')
+    const statusEl = document.getElementById('status')
+    const logEl = document.getElementById('log')
+    const wsUrlInput = document.getElementById('wsUrl')
+    const promptInput = document.getElementById('prompt')
+
+    let socket = null
+
+    function logLine(message) {
+      logEl.textContent += message + '\n'
+      logEl.scrollTop = logEl.scrollHeight
+    }
+
+    function setStatus(text) {
+      statusEl.textContent = 'Status: ' + text
+    }
+
+    connectBtn.addEventListener('click', () => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close()
+        return
+      }
+      socket = new WebSocket(wsUrlInput.value.trim())
+      setStatus('Connecting...')
+
+      socket.addEventListener('open', () => {
+        setStatus('Connected')
+        sendBtn.disabled = false
+        cancelBtn.disabled = false
+        connectBtn.textContent = 'Disconnect'
+        logLine('[open]')
+      })
+
+      socket.addEventListener('message', (event) => {
+        logLine('[message] ' + event.data)
+      })
+
+      socket.addEventListener('close', () => {
+        setStatus('Disconnected')
+        sendBtn.disabled = true
+        cancelBtn.disabled = true
+        connectBtn.textContent = 'Connect'
+        logLine('[close]')
+      })
+
+      socket.addEventListener('error', (event) => {
+        logLine('[error] ' + event.message)
+      })
+    })
+
+    sendBtn.addEventListener('click', () => {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        logLine('[error] socket not connected')
+        return
+      }
+      const payload = {
+        action: 'chatgpt.run',
+        prompt: promptInput.value
+      }
+      socket.send(JSON.stringify(payload))
+      logLine('[send] ' + JSON.stringify(payload))
+    })
+
+    cancelBtn.addEventListener('click', () => {
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        logLine('[error] socket not connected')
+        return
+      }
+      const payload = { action: 'cancel' }
+      socket.send(JSON.stringify(payload))
+      logLine('[send] ' + JSON.stringify(payload))
+    })
+
+    clearBtn.addEventListener('click', () => {
+      logEl.textContent = ''
+    })
+  </script>
+</body>
+</html>

@@ -105,6 +105,7 @@ Endpoints:
 - `POST /tabs/:id/handleDialog` `{ "accept": true }`
 - `POST /tabs/:id/resize` `{ "width": 1280, "height": 720 }`
 - `WS /events` (optional) emits `tab-created`, `tab-closed`, `url-changed`
+- `WS /stream` (ChatGPT prompt runner streaming)
 
 Example requests:
 
@@ -126,6 +127,14 @@ curl -X POST http://127.0.0.1:9333/tabs/123/clickByText \\
 curl -X POST http://127.0.0.1:9333/tabs/123/pressKey \\
   -d '{"key":"Enter"}'
 curl http://127.0.0.1:9333/tabs/123/console
+```
+
+ChatGPT streaming (WebSocket):
+
+```sh
+# Example using wscat
+wscat -c ws://127.0.0.1:9333/stream
+> {"action":"chatgpt.run","prompt":"Explain MCP simply"}
 ```
 
 Example agent flow:
@@ -161,6 +170,7 @@ Tools:
 - `browser_click`, `browser_type`, `browser_press_key`, `browser_hover`, `browser_drag`
 - `browser_fill_form`, `browser_select_option`, `browser_handle_dialog`
 - `browser_wait_for`, `browser_resize`
+- `chatgpt_prompt`
 
 Event stream:
 

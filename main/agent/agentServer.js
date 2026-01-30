@@ -1028,6 +1028,10 @@ function startAgentServer () {
       agentHandleUpgrade(req, socket)
       return
     }
+    if (url.pathname === '/stream' && global.agentStreamingServer && global.agentStreamingServer.handleUpgrade) {
+      global.agentStreamingServer.handleUpgrade(req, socket)
+      return
+    }
     socket.destroy()
   })
 
